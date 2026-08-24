@@ -8,6 +8,14 @@ node_modules/
 .env.*.local
 server/.env
 
+# Build Artifacts
+dist/
+build/
+out/
+
+# Submission zip (local artifact only, not source code)
+*.zip
+
 # Build outputs & caches
 dist/
 client/dist/
