@@ -75,7 +75,7 @@ export const emailService = {
           <p style="margin: 4px 0; color: #cbd5e1;">📍 <strong>Venue:</strong> ${data.venueName}</p>
           <p style="margin: 4px 0; color: #cbd5e1;">🕒 <strong>Time:</strong> ${formattedDate}</p>
           <p style="margin: 4px 0; color: #cbd5e1;">💺 <strong>Seats:</strong> <span style="background: #3b82f6; color: #fff; padding: 2px 8px; border-radius: 4px; font-weight: bold;">${data.seats.join(', ')}</span></p>
-          <p style="margin: 4px 0; color: #cbd5e1;">💳 <strong>Total Paid:</strong> $${data.totalAmount.toFixed(2)}</p>
+          <p style="margin: 4px 0; color: #cbd5e1;">💳 <strong>Total Paid:</strong> ₹${data.totalAmount.toLocaleString('en-IN')}</p>
           <p style="margin: 4px 0; color: #38bdf8; font-family: monospace; font-size: 16px;">🔑 <strong>Reference:</strong> ${data.bookingReference}</p>
         </div>
 
@@ -203,7 +203,7 @@ export const emailService = {
         <h2 style="color: #ef4444;">Booking Cancellation Confirmation</h2>
         <p>Dear ${data.customerName},</p>
         <p>Your booking for <strong>${data.eventTitle}</strong> (Ref: <code>${data.bookingReference}</code>) has been successfully cancelled.</p>
-        <p>A refund of <strong>$${data.refundAmount.toFixed(2)}</strong> has been initiated to your original payment method.</p>
+        <p>A refund of <strong>₹${data.refundAmount.toLocaleString('en-IN')}</strong> has been initiated to your original UPI / Bank account.</p>
         <p>Your seat has been released back into the reallocation system for waitlisted attendees.</p>
       </div>
     `;

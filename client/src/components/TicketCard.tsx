@@ -119,9 +119,9 @@ export const TicketCard: React.FC<TicketCardProps> = ({ booking, showActions = t
               <div>
                 <span className="text-slate-400 text-xs">Total Amount</span>
                 <p className="text-lg font-black text-emerald-400 mt-0.5">
-                  ${booking.totalAmount.toFixed(2)}
+                  ₹{booking.totalAmount.toLocaleString('en-IN')}
                 </p>
-                <span className="text-[10px] text-slate-500">Paid & Verified</span>
+                <span className="text-[10px] text-slate-500">Paid & Verified (GST Incl.)</span>
               </div>
             </div>
 

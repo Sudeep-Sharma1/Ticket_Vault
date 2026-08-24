@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Starting Database Seeding...');
+  console.log('🌱 Starting Database Seeding (India / INR Edition)...');
 
   // 1. Clean existing records
   await prisma.emailLog.deleteMany();
@@ -23,50 +23,50 @@ async function main() {
   const defaultPasswordHash = await bcrypt.hash('password123', 10);
   const adminPasswordHash = await bcrypt.hash('admin123', 10);
 
-  // 3. Create Users
+  // 3. Create Users (India Context)
   const admin = await prisma.user.create({
     data: {
       email: 'admin@tickets.com',
       name: 'System Admin',
       passwordHash: adminPasswordHash,
       role: 'ADMIN',
-      phone: '+1 (555) 019-2831',
+      phone: '+91 98765 43210',
     },
   });
 
   const organiser = await prisma.user.create({
     data: {
       email: 'organiser@events.com',
-      name: 'Apex Entertainment Group',
+      name: 'BookMyShow / Apex India Entertainment',
       passwordHash: defaultPasswordHash,
       role: 'ORGANISER',
-      phone: '+1 (555) 018-9942',
+      phone: '+91 98200 12345',
     },
   });
 
   const customer1 = await prisma.user.create({
     data: {
       email: 'customer@example.com',
-      name: 'Alex Johnson',
+      name: 'Aarav Sharma',
       passwordHash: defaultPasswordHash,
       role: 'CUSTOMER',
-      phone: '+1 (555) 014-5521',
+      phone: '+91 98111 22334',
     },
   });
 
   const customer2 = await prisma.user.create({
     data: {
       email: 'waitlist.demo@example.com',
-      name: 'Sarah Connor',
+      name: 'Priya Patel',
       passwordHash: defaultPasswordHash,
       role: 'CUSTOMER',
-      phone: '+1 (555) 017-8833',
+      phone: '+91 98222 33445',
     },
   });
 
-  console.log('👤 Created demo users (Admin, Organiser, Customer).');
+  console.log('👤 Created Indian demo users (Admin, Organiser, Customers).');
 
-  // 4. Create Venues with Custom Grid Layouts
+  // 4. Create Venues with Custom Grid Layouts (Top Indian Multiplexes & Arenas)
   const imaxLayout = {
     rows: [
       { label: 'A', category: 'VIP', seatCount: 8, aisleAfter: [4] },
@@ -92,9 +92,9 @@ async function main() {
 
   const venue1 = await prisma.venue.create({
     data: {
-      name: 'Grand Horizon Cinema - IMAX Dolby Laser',
-      address: '742 Evergreen Boulevard',
-      city: 'San Francisco, CA',
+      name: 'PVR INOX Superplex - IMAX Laser & Dolby Atmos',
+      address: 'Phoenix Palladium, High Street Phoenix, Lower Parel',
+      city: 'Mumbai, Maharashtra',
       totalCapacity: 60,
       layoutConfig: JSON.stringify(imaxLayout),
     },
@@ -102,22 +102,32 @@ async function main() {
 
   const venue2 = await prisma.venue.create({
     data: {
-      name: 'Starlight Symphony Dome',
-      address: '100 Olympic Way',
-      city: 'Los Angeles, CA',
+      name: 'Jio World Garden & Grand Arena',
+      address: 'Bandra Kurla Complex (BKC), Bandra East',
+      city: 'Mumbai, Maharashtra',
       totalCapacity: 84,
       layoutConfig: JSON.stringify(arenaLayout),
     },
   });
 
-  console.log('🏛️ Created Venues with interactive layouts.');
+  const venue3 = await prisma.venue.create({
+    data: {
+      name: 'Prasads Multiplex - Large Screen IMAX',
+      address: 'Necklace Road, Khairatabad',
+      city: 'Hyderabad, Telangana',
+      totalCapacity: 60,
+      layoutConfig: JSON.stringify(imaxLayout),
+    },
+  });
+
+  console.log('🏛️ Created Indian Venues (Mumbai, Hyderabad).');
 
   // Helper to generate seats for an event
   const createSeatsForEvent = async (eventId: string, layout: any, pricing: any) => {
     const seatsData: any[] = [];
     for (const row of layout.rows) {
       const cat = row.category || 'STANDARD';
-      const price = pricing[cat] || 25;
+      const price = pricing[cat] || 250;
       for (let num = 1; num <= row.seatCount; num++) {
         seatsData.push({
           eventId,
@@ -144,15 +154,15 @@ async function main() {
   nextWeek.setDate(nextWeek.getDate() + 7);
   nextWeek.setHours(20, 0, 0, 0);
 
-  const event1Pricing = { VIP: 45.0, PREMIUM: 30.0, STANDARD: 18.0 };
+  const event1Pricing = { VIP: 550.0, PREMIUM: 350.0, STANDARD: 220.0 };
   const event1 = await prisma.event.create({
     data: {
-      title: 'Interstellar: 10th Anniversary IMAX 70mm Experience',
+      title: 'Kalki 2898 AD: The IMAX 3D Experience',
       description:
-        'Witness Christopher Nolan’s space travel sci-fi masterpiece remastered in crystal-clear IMAX 70mm and Dolby Atmos audio immersion.',
+        'Witness Nag Ashwin’s mythological sci-fi spectacle starring Amitabh Bachchan, Prabhas, Deepika Padukone, and Kamal Haasan in cutting-edge IMAX Laser 3D.',
       category: 'MOVIE',
       bannerUrl: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=1200&auto=format&fit=crop&q=80',
-      durationMinutes: 169,
+      durationMinutes: 181,
       venueId: venue1.id,
       organiserId: organiser.id,
       showTime: tomorrow,
@@ -163,15 +173,15 @@ async function main() {
   });
   await createSeatsForEvent(event1.id, imaxLayout, event1Pricing);
 
-  const event2Pricing = { VIP: 120.0, PREMIUM: 75.0, STANDARD: 45.0 };
+  const event2Pricing = { VIP: 3500.0, PREMIUM: 1800.0, STANDARD: 750.0 };
   const event2 = await prisma.event.create({
     data: {
-      title: 'Coldplay: Music of the Spheres World Tour Live',
+      title: 'A.R. Rahman: Infinite Love Live Symphony India Tour',
       description:
-        'An unforgettable sensory spectacle featuring glowing LED wristbands, laser fireworks, and anthemic hits like Fix You and Yellow.',
+        'The Maestro live in concert featuring a 60-piece symphonic orchestra, state-of-the-art visuals, and evergreen melodies from Roja, Dil Se, Rockstar, and Slumdog Millionaire.',
       category: 'CONCERT',
       bannerUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=1200&auto=format&fit=crop&q=80',
-      durationMinutes: 150,
+      durationMinutes: 180,
       venueId: venue2.id,
       organiserId: organiser.id,
       showTime: nextWeek,
@@ -186,15 +196,15 @@ async function main() {
   const tonight = new Date();
   tonight.setHours(21, 0, 0, 0);
 
-  const soldOutPricing = { VIP: 90.0, PREMIUM: 60.0, STANDARD: 35.0 };
+  const soldOutPricing = { VIP: 850.0, PREMIUM: 550.0, STANDARD: 300.0 };
   const soldOutEvent = await prisma.event.create({
     data: {
-      title: 'Dune: Part Two - Exclusive Director’s Cut Gala',
+      title: 'Pushpa 2: The Rule - First Day First Show Gala Premiere',
       description:
-        'Exclusive premiere screening with red carpet access. High-demand event with full waitlist reallocation enabled.',
+        'Allu Arjun returns in the most anticipated blockbuster of the decade. Red carpet star premiere with full waitlist reallocation enabled.',
       category: 'MOVIE',
       bannerUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1200&auto=format&fit=crop&q=80',
-      durationMinutes: 166,
+      durationMinutes: 175,
       venueId: venue1.id,
       organiserId: organiser.id,
       showTime: tonight,
@@ -219,14 +229,14 @@ async function main() {
 
   const demoBooking = await prisma.booking.create({
     data: {
-      bookingReference: 'TB-DEMO-VIP01',
+      bookingReference: 'TB-IN-VIP01',
       eventId: soldOutEvent.id,
       userId: customer1.id,
       customerName: customer1.name,
       customerEmail: customer1.email,
-      totalAmount: 180.0,
+      totalAmount: 1700.0, // ₹1,700 for 2 VIP tickets
       status: 'CONFIRMED',
-      qrCodeData: JSON.stringify({ ref: 'TB-DEMO-VIP01', event: soldOutEvent.title, seats: ['A-1', 'A-2'] }),
+      qrCodeData: JSON.stringify({ ref: 'TB-IN-VIP01', event: soldOutEvent.title, seats: ['A-1', 'A-2'] }),
       qrCodeImage: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
       items: {
         create: vipSeats.map((s) => ({
@@ -239,7 +249,7 @@ async function main() {
     },
   });
 
-  // Put customer2 on the waitlist for this VIP category so when user cancels demoBooking, customer2 gets the seat automatically!
+  // Put Priya Patel on the waitlist for this VIP category so when user cancels demoBooking, Priya gets the seat automatically!
   await prisma.waitlistEntry.create({
     data: {
       eventId: soldOutEvent.id,
@@ -250,8 +260,8 @@ async function main() {
     },
   });
 
-  console.log('⚡ Created High-Demand Event with pre-configured Waitlist and active booking for live cancellation demo.');
-  console.log('✅ Database Seeding Completed Successfully!');
+  console.log('⚡ Created High-Demand Indian Event with pre-configured Waitlist and active booking for live cancellation demo.');
+  console.log('✅ Database Seeding Completed Successfully with Indian (INR ₹) Edition!');
 }
 
 main()

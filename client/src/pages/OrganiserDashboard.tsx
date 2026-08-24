@@ -151,7 +151,7 @@ export const OrganiserDashboard: React.FC = () => {
             </div>
           </div>
           <p className="text-2xl font-black text-white font-mono mt-3">
-            ${(metrics.totalRevenue || 0).toFixed(2)}
+            ₹{(metrics.totalRevenue || 0).toLocaleString('en-IN')}
           </p>
           <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1 mt-1">
             <TrendingUp className="w-3 h-3" /> Confirmed bookings only
@@ -284,7 +284,7 @@ export const OrganiserDashboard: React.FC = () => {
                       )}
                     </td>
                     <td className="px-6 py-4 text-right font-mono font-bold text-emerald-400 text-sm">
-                      ${ev.revenue.toFixed(2)}
+                      ₹{ev.revenue.toLocaleString('en-IN')}
                     </td>
                   </tr>
                 );

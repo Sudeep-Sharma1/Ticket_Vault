@@ -208,7 +208,7 @@ export const CustomerBookingsPage: React.FC = () => {
                     <div className="text-left md:text-right">
                       <span className="text-[10px] text-slate-400 uppercase block">Total</span>
                       <span className="text-base font-black text-emerald-400 font-mono">
-                        ${b.totalAmount.toFixed(2)}
+                        ₹{b.totalAmount.toLocaleString('en-IN')}
                       </span>
                     </div>
 
@@ -349,7 +349,7 @@ export const CustomerBookingsPage: React.FC = () => {
                 immediately reallocated to the next customers in the priority waitlist!
               </p>
               <p className="font-semibold text-emerald-400 pt-1">
-                Refund Amount: ${cancellingBooking.totalAmount.toFixed(2)}
+                Instant UPI / Bank Refund: ₹{cancellingBooking.totalAmount.toLocaleString('en-IN')}
               </p>
             </div>
 

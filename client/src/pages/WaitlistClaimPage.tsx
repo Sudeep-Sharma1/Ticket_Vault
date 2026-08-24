@@ -150,7 +150,7 @@ export const WaitlistClaimPage: React.FC = () => {
                 <span className="font-mono text-base font-black text-white">{seat.label}</span>
               </div>
               <span className="font-mono text-base font-black text-emerald-400">
-                ${seat.price.toFixed(2)}
+                ₹{seat.price.toLocaleString('en-IN')}
               </span>
             </div>
           )}

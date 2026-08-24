@@ -141,7 +141,7 @@ export const SeatMap: React.FC<SeatMapProps> = ({
             <span className="text-slate-400">•</span>
             <span className="font-semibold text-cyan-400">{hoveredSeat.category} Tier</span>
             <span className="text-slate-400">•</span>
-            <span className="font-bold text-emerald-400">${hoveredSeat.price.toFixed(2)}</span>
+            <span className="font-bold text-emerald-400">₹{hoveredSeat.price}</span>
             <span className="text-slate-400">•</span>
             <span className="text-slate-300 italic">{getSeatStatusText(hoveredSeat)}</span>
           </div>
@@ -155,15 +155,15 @@ export const SeatMap: React.FC<SeatMapProps> = ({
         {/* Available Tier Badges */}
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 rounded bg-amber-500/30 border border-amber-500/50" />
-          <span>VIP (${tierPricing.VIP || 45})</span>
+          <span>VIP (₹{tierPricing.VIP || 550})</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 rounded bg-cyan-500/30 border border-cyan-500/50" />
-          <span>Premium (${tierPricing.PREMIUM || 30})</span>
+          <span>Premium (₹{tierPricing.PREMIUM || 350})</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 rounded bg-indigo-500/30 border border-indigo-500/50" />
-          <span>Standard (${tierPricing.STANDARD || 18})</span>
+          <span>Standard (₹{tierPricing.STANDARD || 220})</span>
         </div>
 
         <div className="h-4 w-px bg-slate-700 hidden sm:block" />

@@ -275,7 +275,7 @@ export const HomePage: React.FC = () => {
                           From
                         </span>
                         <span className="text-lg font-black text-emerald-400 font-mono">
-                          ${getLowestPrice(event.tierPricing).toFixed(2)}
+                          ₹{getLowestPrice(event.tierPricing).toLocaleString('en-IN')}
                         </span>
                       </div>
 

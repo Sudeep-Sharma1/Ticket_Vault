@@ -215,33 +215,47 @@ export const CheckoutPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Payment Method Simulator */}
+            {/* Payment Method Simulator (India UPI / Cards / NetBanking) */}
             <div className="pt-4 border-t border-slate-800">
               <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3">
-                Payment Simulation
+                Select Indian Payment Mode
               </h4>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-2.5">
                 <button
                   type="button"
-                  onClick={() => setPaymentMethod('CARD')}
-                  className={`p-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition ${
-                    paymentMethod === 'CARD'
-                      ? 'bg-indigo-950/80 border-indigo-500 text-white'
+                  onClick={() => setPaymentMethod('UPI')}
+                  className={`p-3 rounded-xl border text-xs font-semibold flex flex-col items-center justify-center gap-1 transition ${
+                    paymentMethod === 'UPI' || paymentMethod === 'CARD'
+                      ? 'bg-indigo-950/80 border-indigo-500 text-white ring-2 ring-indigo-500/40'
                       : 'bg-slate-900 border-slate-800 text-slate-400'
                   }`}
                 >
-                  <CreditCard className="w-4 h-4 text-indigo-400" /> Instant Sandbox Card
+                  <span className="font-bold text-cyan-400 text-sm">⚡ UPI</span>
+                  <span className="text-[10px] text-slate-400">GPay / PhonePe / Paytm</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPaymentMethod('APPLE_PAY')}
-                  className={`p-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition ${
-                    paymentMethod === 'APPLE_PAY'
-                      ? 'bg-indigo-950/80 border-indigo-500 text-white'
+                  onClick={() => setPaymentMethod('CARDS')}
+                  className={`p-3 rounded-xl border text-xs font-semibold flex flex-col items-center justify-center gap-1 transition ${
+                    paymentMethod === 'CARDS'
+                      ? 'bg-indigo-950/80 border-indigo-500 text-white ring-2 ring-indigo-500/40'
                       : 'bg-slate-900 border-slate-800 text-slate-400'
                   }`}
                 >
-                  <Lock className="w-4 h-4 text-cyan-400" /> Apple Pay / GPay
+                  <CreditCard className="w-4 h-4 text-emerald-400" />
+                  <span className="text-[10px] text-slate-300">RuPay / Visa / Master</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod('NETBANKING')}
+                  className={`p-3 rounded-xl border text-xs font-semibold flex flex-col items-center justify-center gap-1 transition ${
+                    paymentMethod === 'NETBANKING'
+                      ? 'bg-indigo-950/80 border-indigo-500 text-white ring-2 ring-indigo-500/40'
+                      : 'bg-slate-900 border-slate-800 text-slate-400'
+                  }`}
+                >
+                  <Lock className="w-4 h-4 text-purple-400" />
+                  <span className="text-[10px] text-slate-300">HDFC / SBI / ICICI</span>
                 </button>
               </div>
             </div>
@@ -254,12 +268,12 @@ export const CheckoutPage: React.FC = () => {
               {submitting ? (
                 <>
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>Processing Booking & Generating QR...</span>
+                  <span>Processing Payment & Generating QR Ticket...</span>
                 </>
               ) : (
                 <>
                   <ShieldCheck className="w-4 h-4" />
-                  <span>Confirm Booking • Pay ${totalAmount.toFixed(2)}</span>
+                  <span>Confirm Booking • Pay ₹{totalAmount.toLocaleString('en-IN')}</span>
                 </>
               )}
             </button>
@@ -282,7 +296,7 @@ export const CheckoutPage: React.FC = () => {
               <div className="text-xs text-slate-400 space-y-1 pt-1">
                 <div className="flex items-center gap-1.5">
                   <Calendar className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>{new Date(event.showTime).toLocaleString()}</span>
+                  <span>{new Date(event.showTime).toLocaleString('en-IN')}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <MapPin className="w-3.5 h-3.5 text-cyan-400" />
@@ -304,7 +318,7 @@ export const CheckoutPage: React.FC = () => {
                     <span className="font-mono font-bold text-white">Seat {seat.label}</span>
                     <span className="text-[10px] text-slate-400">({seat.category} Tier)</span>
                   </div>
-                  <span className="font-mono font-bold text-emerald-400">${seat.price.toFixed(2)}</span>
+                  <span className="font-mono font-bold text-emerald-400">₹{seat.price.toLocaleString('en-IN')}</span>
                 </div>
               ))}
             </div>
@@ -313,16 +327,16 @@ export const CheckoutPage: React.FC = () => {
             <div className="pt-4 border-t border-slate-800 space-y-2 text-xs">
               <div className="flex justify-between text-slate-400">
                 <span>Subtotal</span>
-                <span className="font-mono text-slate-200">${totalAmount.toFixed(2)}</span>
+                <span className="font-mono text-slate-200">₹{totalAmount.toLocaleString('en-IN')}</span>
               </div>
               <div className="flex justify-between text-slate-400">
-                <span>Booking Fee & Taxes</span>
-                <span className="font-mono text-emerald-400">Free ($0.00)</span>
+                <span>Convenience Fee & GST (18%)</span>
+                <span className="font-mono text-emerald-400">Included (₹0.00 extra)</span>
               </div>
               <div className="flex justify-between text-sm font-bold text-white pt-2 border-t border-slate-800">
                 <span>Total Amount Due</span>
                 <span className="font-mono text-emerald-400 text-base font-black">
-                  ${totalAmount.toFixed(2)}
+                  ₹{totalAmount.toLocaleString('en-IN')}
                 </span>
               </div>
             </div>

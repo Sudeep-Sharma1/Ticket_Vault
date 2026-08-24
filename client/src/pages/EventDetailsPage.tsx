@@ -362,7 +362,7 @@ export const EventDetailsPage: React.FC = () => {
             <div className="sm:pl-6 sm:border-l sm:border-slate-800 text-right sm:text-left">
               <span className="text-xs text-slate-400 block font-medium">Total Amount</span>
               <span className="text-xl font-black text-emerald-400 font-mono">
-                ${totalPrice.toFixed(2)}
+                ₹{totalPrice.toLocaleString('en-IN')}
               </span>
             </div>
           </div>
@@ -423,7 +423,7 @@ export const EventDetailsPage: React.FC = () => {
                 >
                   <span>{cat}</span>
                   <span className="text-[10px] font-mono text-purple-300">
-                    ${(event.tierPricing as any)[cat] || 25}
+                    ₹{(event.tierPricing as any)[cat] || 250}
                   </span>
                 </button>
               ))}
