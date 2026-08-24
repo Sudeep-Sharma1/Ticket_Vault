@@ -1,0 +1,180 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id           String          @id @default(uuid())
+  email        String          @unique
+  name         String
+  passwordHash String
+  role         String          @default("CUSTOMER") // CUSTOMER, ORGANISER, ADMIN
+  phone        String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  events       Event[]         @relation("OrganiserEvents")
+  bookings     Booking[]
+  holds        SeatHold[]
+  waitlists    WaitlistEntry[]
+
+  @@index([email])
+}
+
+model Venue {
+  id            String   @id @default(uuid())
+  name          String
+  address       String
+  city          String
+  totalCapacity Int
+  layoutConfig  String   // JSON string of rows, columns, aisles, tier mapping
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  events        Event[]
+}
+
+model Event {
+  id              String          @id @default(uuid())
+  title           String
+  description     String
+  category        String          @default("MOVIE") // MOVIE, CONCERT
+  bannerUrl       String?
+  durationMinutes Int             @default(120)
+  venueId         String
+  venue           Venue           @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  organiserId     String
+  organiser       User            @relation("OrganiserEvents", fields: [organiserId], references: [id])
+  showTime        DateTime
+  status          String          @default("PUBLISHED") // DRAFT, PUBLISHED, SOLD_OUT, CANCELLED, COMPLETED
+  tierPricing     String          // JSON: { "VIP": 45.00, "PREMIUM": 30.00, "STANDARD": 18.00 }
+  holdTtlMinutes  Int             @default(10)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  seats           Seat[]
+  holds           SeatHold[]
+  bookings        Booking[]
+  waitlistEntries WaitlistEntry[]
+
+  @@index([showTime])
+  @@index([category])
+  @@index([status])
+}
+
+model Seat {
+  id        String          @id @default(uuid())
+  eventId   String
+  event     Event           @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  row       String
+  number    Int
+  label     String          // e.g., "A-1", "D-14"
+  category  String          @default("STANDARD") // VIP, PREMIUM, STANDARD
+  price     Float
+  status    String          @default("AVAILABLE") // AVAILABLE, HELD, BOOKED, WAITLIST_RESERVED
+  version   Int             @default(1) // Optimistic concurrency version
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  holds     SeatHold[]
+  items     BookingItem[]
+
+  @@unique([eventId, label])
+  @@index([eventId, status])
+  @@index([eventId, category])
+}
+
+model SeatHold {
+  id          String    @id @default(uuid())
+  eventId     String
+  event       Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  seatId      String
+  seat        Seat      @relation(fields: [seatId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  holdToken   String    @unique
+  expiresAt   DateTime
+  isExpired   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+
+  @@index([expiresAt, isExpired])
+  @@index([eventId, seatId])
+  @@index([userId])
+}
+
+model Booking {
+  id               String        @id @default(uuid())
+  bookingReference String        @unique
+  eventId          String
+  event            Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customerName     String
+  customerEmail    String
+  customerPhone    String?
+  totalAmount      Float
+  status           String        @default("CONFIRMED") // CONFIRMED, CANCELLED, REFUNDED
+  qrCodeData       String        // Payload encoded into QR
+  qrCodeImage      String        // Base64 QR Data URL
+  checkInStatus    String        @default("PENDING") // PENDING, CHECKED_IN
+  checkInTime      DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  items            BookingItem[]
+
+  @@index([bookingReference])
+  @@index([userId])
+  @@index([eventId])
+}
+
+model BookingItem {
+  id          String       @id @default(uuid())
+  bookingId   String
+  booking     Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  seatId      String
+  seat        Seat         @relation(fields: [seatId], references: [id])
+  seatLabel   String
+  category    String       // VIP, PREMIUM, STANDARD
+  price       Float
+
+  @@index([bookingId])
+  @@index([seatId])
+}
+
+model WaitlistEntry {
+  id              String         @id @default(uuid())
+  eventId         String
+  event           Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category        String         // VIP, PREMIUM, STANDARD
+  status          String         @default("WAITING") // WAITING, OFFERED, CLAIMED, EXPIRED, CANCELLED
+  position        Int            @default(1)
+  offerToken      String?        @unique
+  offerExpiresAt  DateTime?
+  offeredSeatId   String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([eventId, category, status])
+  @@index([userId])
+  @@index([offerToken])
+}
+
+model EmailLog {
+  id             String    @id @default(uuid())
+  recipientEmail String
+  subject        String
+  type           String    // BOOKING_CONFIRMATION, WAITLIST_OFFER, WAITLIST_EXPIRED, CANCELLATION_NOTICE
+  previewUrl     String?
+  htmlContent    String
+  sentAt         DateTime  @default(now())
+
+  @@index([recipientEmail])
+  @@index([sentAt])
+}
