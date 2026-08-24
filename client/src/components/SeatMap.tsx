@@ -107,7 +107,7 @@ export const SeatMap: React.FC<SeatMapProps> = ({
                         className={`w-8 h-8 rounded-lg text-xs font-mono font-semibold flex items-center justify-center transition-all duration-150 border relative ${getSeatColor(
                           seat
                         )}`}
-                        title={`Seat ${seat.label} • $${seat.price}`}
+                        title={`Seat ${seat.label} • ₹${seat.price}`}
                       >
                         {selected ? (
                           <Check className="w-4 h-4" />
