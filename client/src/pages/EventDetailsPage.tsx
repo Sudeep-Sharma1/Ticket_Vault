@@ -282,13 +282,46 @@ export const EventDetailsPage: React.FC = () => {
 
       {/* Visual Seat Map Component */}
       <div className="glass-panel rounded-3xl p-6 sm:p-10 border border-slate-800 shadow-2xl">
-        <div className="text-center mb-6">
-          <h2 className="text-xl font-bold text-white font-heading">
-            Interactive Visual Seating Map
-          </h2>
-          <p className="text-xs text-slate-400 mt-1">
-            Real-time status synced over WebSockets. Click available seats to select.
-          </p>
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-800/80">
+          <div className="text-center sm:text-left">
+            <h2 className="text-xl font-bold text-white font-heading">
+              Interactive Visual Seating Map
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Held seats (clock icon) are locked in checkout sessions and auto-release on TTL timeout.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {user && (
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await api.releaseMyEventHolds(id!);
+                    loadEventAndSeats();
+                  } catch (e) {}
+                }}
+                className="px-3 py-1.5 rounded-xl bg-amber-950/60 hover:bg-amber-900/80 text-amber-300 border border-amber-500/40 text-xs font-semibold transition"
+                title="Release seats held in your previous checkout sessions"
+              >
+                Release My Holds
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await api.resetEventHolds(id!);
+                  loadEventAndSeats();
+                } catch (e) {}
+              }}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition"
+              title="Demo Helper: Unlock all currently held seats back to Available immediately"
+            >
+              Clear All Held Seats
+            </button>
+          </div>
         </div>
 
         <SeatMap

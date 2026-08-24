@@ -113,6 +113,43 @@ export const seatController = {
     }
   },
 
+  // Release all active holds for current user on this event
+  releaseMyEventHolds: async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      const { eventId } = req.body;
+      const userId = req.user!.id;
+
+      if (!eventId) {
+        throw new AppError('Event ID is required', 400);
+      }
+
+      const result = await holdService.releaseUserEventHolds(eventId, userId);
+
+      res.json({
+        message: 'Your active holds for this event have been released.',
+        ...result,
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  // Reset all held seats for an event (Testing & Demo utility)
+  resetEventHolds: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { eventId } = req.params;
+
+      const result = await holdService.resetEventHolds(eventId);
+
+      res.json({
+        message: 'All held seats for this event have been released back to Available.',
+        ...result,
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+
   // Get active hold details
   getHoldDetails: async (req: Request, res: Response, next: NextFunction) => {
     try {

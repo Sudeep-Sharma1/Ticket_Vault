@@ -72,6 +72,10 @@ export const api = {
     request('/seats/hold', { method: 'POST', body: JSON.stringify({ eventId, seatIds }) }),
   releaseHold: (holdToken: string) =>
     request('/seats/release', { method: 'POST', body: JSON.stringify({ holdToken }) }),
+  releaseMyEventHolds: (eventId: string) =>
+    request('/seats/release-my-holds', { method: 'POST', body: JSON.stringify({ eventId }) }),
+  resetEventHolds: (eventId: string) =>
+    request(`/seats/reset-event-holds/${eventId}`, { method: 'POST' }),
   getHoldDetails: (holdToken: string) => request(`/seats/hold/${holdToken}`),
 
   // Bookings & Checkout

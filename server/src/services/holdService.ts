@@ -151,6 +151,64 @@ export const holdService = {
   },
 
   /**
+   * Release all active holds for a specific user and event
+   */
+  releaseUserEventHolds: async (eventId: string, userId: string) => {
+    const holds = await prisma.seatHold.findMany({
+      where: {
+        eventId,
+        userId,
+        isExpired: false,
+      },
+      include: { seat: true },
+    });
+
+    if (holds.length === 0) return { released: 0 };
+
+    const holdIds = holds.map((h) => h.id);
+    await prisma.seatHold.updateMany({
+      where: { id: { in: holdIds } },
+      data: { isExpired: true },
+    });
+
+    for (const hold of holds) {
+      if (hold.seat.status === 'HELD') {
+        await waitlistService.assignNextInQueue(eventId, hold.seatId, hold.seat.category);
+      }
+    }
+
+    return { released: holds.length, eventId };
+  },
+
+  /**
+   * Dev/Demo Tool: Reset all held seats for an event back to available immediately
+   */
+  resetEventHolds: async (eventId: string) => {
+    await prisma.seatHold.updateMany({
+      where: { eventId, isExpired: false },
+      data: { isExpired: true },
+    });
+
+    const heldSeats = await prisma.seat.findMany({
+      where: { eventId, status: 'HELD' },
+    });
+
+    const seatIds = heldSeats.map((s) => s.id);
+
+    await prisma.seat.updateMany({
+      where: { id: { in: seatIds } },
+      data: { status: 'AVAILABLE', version: { increment: 1 } },
+    });
+
+    socketEmitter.emitSeatStatusChange(eventId, {
+      seatIds,
+      status: 'AVAILABLE',
+    });
+
+    return { released: seatIds.length, eventId };
+  },
+
+  /**
    * Get active hold details by holdToken
    */
   getHoldDetails: async (holdToken: string) => {

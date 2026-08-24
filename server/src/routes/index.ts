@@ -41,6 +41,8 @@ router.get('/organiser/dashboard', authenticateToken, requireRole('ORGANISER', '
 router.get('/seats/event/:eventId', seatController.getEventSeatMap);
 router.post('/seats/hold', authenticateToken, seatController.holdSeats);
 router.post('/seats/release', optionalAuth, seatController.releaseHold);
+router.post('/seats/release-my-holds', authenticateToken, seatController.releaseMyEventHolds);
+router.post('/seats/reset-event-holds/:eventId', seatController.resetEventHolds);
 router.get('/seats/hold/:holdToken', seatController.getHoldDetails);
 
 // ==========================================
