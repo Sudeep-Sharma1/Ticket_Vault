@@ -96,11 +96,12 @@ model SeatHold {
   seat        Seat      @relation(fields: [seatId], references: [id], onDelete: Cascade)
   userId      String
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  holdToken   String    @unique
+  holdToken   String    // shared by every seat in one hold session (not unique)
   expiresAt   DateTime
   isExpired   Boolean   @default(false)
   createdAt   DateTime  @default(now())
 
+  @@index([holdToken])
   @@index([expiresAt, isExpired])
   @@index([eventId, seatId])
   @@index([userId])
