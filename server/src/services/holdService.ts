@@ -43,55 +43,45 @@ export const holdService = {
     const expiresAt = new Date(Date.now() + holdTtl * 60 * 1000);
     const holdToken = generateSecureToken(24);
 
-    // 1. Atomic Compare-And-Swap (CAS) Update
-    // SQLite executes single SQL statements atomically.
-    // Only seats currently in 'AVAILABLE' status will be updated to 'HELD'.
-    const updateResult = await prisma.seat.updateMany({
-      where: {
-        id: { in: seatIds },
-        eventId,
-        status: 'AVAILABLE',
-      },
-      data: {
-        status: 'HELD',
-        version: { increment: 1 },
-      },
-    });
+    // 1-3 run inside ONE transaction: the seat status change and the SeatHold
+    // records are committed together or not at all. On a conflict, throwing
+    // rolls back only the rows this request changed, so seats legitimately
+    // held by other customers are never touched.
+    await prisma.$transaction(async (tx) => {
+      // 1. Atomic Compare-And-Swap (CAS) Update
+      // Only seats currently in 'AVAILABLE' status will be updated to 'HELD'.
+      const updateResult = await tx.seat.updateMany({
+        where: {
+          id: { in: seatIds },
+          eventId,
+          status: 'AVAILABLE',
+        },
+        data: {
+          status: 'HELD',
+          version: { increment: 1 },
+        },
+      });
 
-    // 2. If not all seats could be locked atomically, conflict occurred
-    if (updateResult.count !== seatIds.length) {
-      // Rollback any seats that were partially updated in this operation
-      if (updateResult.count > 0) {
-        await prisma.seat.updateMany({
-          where: {
-            id: { in: seatIds },
-            eventId,
-            status: 'HELD',
-          },
-          data: {
-            status: 'AVAILABLE',
-          },
-        });
+      // 2. If not all seats could be locked atomically, a conflict occurred.
+      // Throwing aborts the transaction and undoes this request's partial update.
+      if (updateResult.count !== seatIds.length) {
+        throw new AppError(
+          'One or more selected seats were just taken or held by another customer. Please select available seats.',
+          409
+        );
       }
 
-      throw new AppError(
-        'One or more selected seats were just taken or held by another customer. Please select available seats.',
-        409
-      );
-    }
-
-    // 3. Create SeatHold records
-    const holdData = seatIds.map((seatId) => ({
-      eventId,
-      seatId,
-      userId,
-      holdToken,
-      expiresAt,
-      isExpired: false,
-    }));
-
-    await prisma.seatHold.createMany({
-      data: holdData,
+      // 3. Create SeatHold records (one per seat, all sharing the same holdToken)
+      await tx.seatHold.createMany({
+        data: seatIds.map((seatId) => ({
+          eventId,
+          seatId,
+          userId,
+          holdToken,
+          expiresAt,
+          isExpired: false,
+        })),
+      });
     });
 
     const heldSeats = await prisma.seat.findMany({
