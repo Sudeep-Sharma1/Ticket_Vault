@@ -190,6 +190,66 @@ export const emailService = {
     console.log(`[Email Sent] Waitlist Offer -> ${data.recipientEmail} (${claimUrl})`);
   },
 
+  sendTicketTransfer: async (data: {
+    senderEmail: string;
+    senderName: string;
+    recipientEmail: string;
+    recipientName: string;
+    bookingReference: string;
+    eventTitle: string;
+    seats: string[];
+    qrCodeImage: string;
+  }) => {
+    const recipientSubject = `🎁 ${data.senderName} sent you tickets: ${data.eventTitle}`;
+    const recipientHtml = `
+      <div style="font-family: Arial, sans-serif; background-color: #0f172a; color: #f8fafc; padding: 30px; border-radius: 12px; max-width: 600px; margin: auto;">
+        <h2 style="color: #38bdf8; margin-top: 0;">You've received a ticket transfer</h2>
+        <p>Hi ${data.recipientName}, <strong>${data.senderName}</strong> transferred their booking for <strong>${data.eventTitle}</strong> to you.</p>
+        <p>💺 <strong>Seats:</strong> ${data.seats.join(', ')} &nbsp;•&nbsp; 🔑 <strong>Reference:</strong> <code>${data.bookingReference}</code></p>
+        <div style="text-align: center; background: #ffffff; padding: 20px; border-radius: 8px; margin: 20px 0;">
+          <img src="${data.qrCodeImage}" alt="QR Ticket" style="width: 220px; height: 220px; display: inline-block;" />
+          <p style="color: #64748b; font-size: 12px; margin: 8px 0 0;">This is a freshly signed VaultPass issued in your name.</p>
+        </div>
+      </div>
+    `;
+
+    const senderSubject = `🔁 Ticket transferred: ${data.bookingReference}`;
+    const senderHtml = `
+      <div style="font-family: Arial, sans-serif; background-color: #0f172a; color: #f8fafc; padding: 30px; border-radius: 12px; max-width: 600px; margin: auto;">
+        <h2 style="color: #f59e0b; margin-top: 0;">Transfer complete</h2>
+        <p>Hi ${data.senderName}, your booking <code>${data.bookingReference}</code> for <strong>${data.eventTitle}</strong> now belongs to <strong>${data.recipientName}</strong> (${data.recipientEmail}).</p>
+        <p>Your previous QR pass has been revoked and will be rejected at the gate.</p>
+      </div>
+    `;
+
+    for (const mail of [
+      { to: data.recipientEmail, subject: recipientSubject, html: recipientHtml },
+      { to: data.senderEmail, subject: senderSubject, html: senderHtml },
+    ]) {
+      let previewUrl: string | undefined = undefined;
+      try {
+        const mailer = await getTransporter();
+        const info = await mailer.sendMail({ from: ENV.SMTP_FROM, ...mail });
+        const ethUrl = nodemailer.getTestMessageUrl(info);
+        if (ethUrl) previewUrl = ethUrl.toString();
+      } catch (err) {
+        console.warn('[Email Warning] Could not send via SMTP transport:', err);
+      }
+
+      await prisma.emailLog.create({
+        data: {
+          recipientEmail: mail.to,
+          subject: mail.subject,
+          type: 'TICKET_TRANSFER',
+          previewUrl,
+          htmlContent: mail.html,
+        },
+      });
+    }
+
+    console.log(`[Email Sent] Ticket Transfer ${data.bookingReference}: ${data.senderEmail} -> ${data.recipientEmail}`);
+  },
+
   sendCancellationNotice: async (data: {
     recipientEmail: string;
     customerName: string;

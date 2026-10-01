@@ -19,6 +19,8 @@ interface TicketCardProps {
 
 export const TicketCard: React.FC<TicketCardProps> = ({ booking, showActions = true }) => {
   const [copied, setCopied] = useState(false);
+  const [passCopied, setPassCopied] = useState(false);
+  const isSignedPass = booking.qrCodeData?.startsWith('TV1.');
 
   const formattedDate = new Date(booking.event.showTime).toLocaleDateString('en-US', {
     weekday: 'short',
@@ -36,6 +38,12 @@ export const TicketCard: React.FC<TicketCardProps> = ({ booking, showActions = t
     navigator.clipboard.writeText(booking.bookingReference);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleCopyPass = () => {
+    navigator.clipboard.writeText(booking.qrCodeData);
+    setPassCopied(true);
+    setTimeout(() => setPassCopied(false), 2000);
   };
 
   const handlePrint = () => {
@@ -158,6 +166,21 @@ export const TicketCard: React.FC<TicketCardProps> = ({ booking, showActions = t
             <p className="text-[11px] text-slate-500 mt-2 leading-tight">
               Scan at entrance turns gate green for instant entry.
             </p>
+            {isSignedPass && (
+              <div className="mt-3 flex flex-col items-center gap-1.5">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold">
+                  <ShieldCheck className="w-3 h-3" /> Signed VaultPass
+                </span>
+                <button
+                  onClick={handleCopyPass}
+                  className="text-[10px] font-semibold text-indigo-600 hover:underline flex items-center gap-1"
+                  title="Copy the signed pass code to paste into the gate scanner"
+                >
+                  {passCopied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                  {passCopied ? 'Pass code copied' : 'Copy pass code'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

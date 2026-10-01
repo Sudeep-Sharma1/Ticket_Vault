@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/prisma';
 import { AppError } from '../middleware/errorHandler';
+import { isVaultPassToken, verifyVaultPass } from '../utils/ticketSignature';
 
 export const adminController = {
   // System Overview Metrics
@@ -35,22 +36,38 @@ export const adminController = {
   },
 
   // QR Code Ticket Verification & Entry Check-In
+  // Signed VaultPass tokens are verified cryptographically; a typed booking
+  // reference is accepted as a staff-assisted manual lookup.
   verifyTicket: async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { bookingReference, qrPayload } = req.body;
+      const scanned = typeof qrPayload === 'string' ? qrPayload.trim() : '';
 
-      let ref = bookingReference;
+      let ref: string | undefined;
+      let method: 'SIGNED_QR' | 'MANUAL_REFERENCE';
 
-      if (!ref && qrPayload) {
-        try {
-          const parsed = typeof qrPayload === 'string' ? JSON.parse(qrPayload) : qrPayload;
-          ref = parsed.ref;
-        } catch {
-          ref = qrPayload;
+      if (isVaultPassToken(scanned)) {
+        const verification = verifyVaultPass(scanned);
+        if (!verification.valid) {
+          return res.status(400).json({
+            status: 'FORGED',
+            message:
+              verification.reason === 'BAD_SIGNATURE'
+                ? '🛑 Forged Ticket: QR signature does not match. This pass was not issued by TicketVault or has been edited.'
+                : '🛑 Unreadable Ticket: QR data is malformed.',
+          });
         }
-      }
-
-      if (!ref) {
+        ref = verification.claims.ref;
+        method = 'SIGNED_QR';
+      } else if (typeof bookingReference === 'string' && bookingReference.trim()) {
+        ref = bookingReference.trim().toUpperCase();
+        method = 'MANUAL_REFERENCE';
+      } else if (scanned) {
+        return res.status(400).json({
+          status: 'FORGED',
+          message: '🛑 Unsigned Ticket: This QR is not a signed VaultPass and cannot be admitted.',
+        });
+      } else {
         throw new AppError('Booking reference or QR code data is required', 400);
       }
 
@@ -78,21 +95,35 @@ export const adminController = {
         });
       }
 
-      if (booking.checkInStatus === 'CHECKED_IN') {
+      // A genuine signature over an outdated token means the pass was re-issued
+      // (e.g. transferred to someone else) and this copy is no longer valid.
+      if (method === 'SIGNED_QR' && booking.qrCodeData !== scanned) {
         return res.status(400).json({
-          status: 'ALREADY_CHECKED_IN',
-          message: `⚠️ Ticket Already Used at ${new Date(booking.checkInTime!).toLocaleTimeString()}`,
-          booking,
+          status: 'REVOKED',
+          message: '🔁 Revoked Pass: This QR was superseded (ticket transferred or re-issued). Ask the holder for their current pass.',
         });
       }
 
-      // Check-in ticket
-      const updatedBooking = await prisma.booking.update({
-        where: { id: booking.id },
+      // Atomic CAS check-in: only one of several simultaneous scans can flip PENDING -> CHECKED_IN
+      const checkIn = await prisma.booking.updateMany({
+        where: { id: booking.id, checkInStatus: 'PENDING' },
         data: {
           checkInStatus: 'CHECKED_IN',
           checkInTime: new Date(),
         },
+      });
+
+      if (checkIn.count === 0) {
+        const current = await prisma.booking.findUnique({ where: { id: booking.id } });
+        return res.status(400).json({
+          status: 'ALREADY_CHECKED_IN',
+          message: `⚠️ Ticket Already Used at ${new Date(current!.checkInTime!).toLocaleTimeString()}`,
+          booking,
+        });
+      }
+
+      const updatedBooking = await prisma.booking.findUnique({
+        where: { id: booking.id },
         include: {
           items: true,
           event: { include: { venue: true } },
@@ -102,7 +133,11 @@ export const adminController = {
 
       return res.json({
         status: 'VALID',
-        message: '✅ Ticket Valid: Check-in Successful!',
+        method,
+        message:
+          method === 'SIGNED_QR'
+            ? '✅ Ticket Valid: Signature verified, check-in successful!'
+            : '✅ Manual Check-in: Reference matched (no QR signature checked).',
         booking: updatedBooking,
       });
     } catch (err) {

@@ -9,11 +9,51 @@
 - ⚡ **Atomic Concurrency Protection**: High-throughput Compare-And-Swap (CAS) database-level locks guarantee zero double-holding or race conditions even under high flash-sale load.
 - ⏱️ **Seat Hold with Configurable TTL**: Seats selected on the visual grid are held with a live countdown timer (e.g. 10 minutes). Abandoned holds are automatically released by background workers.
 - 🔄 **Automated Waitlist Reallocation**: Sold-out shows feature a FIFO waitlist per seat category. When a booking is cancelled or a hold is dropped, the system automatically assigns the seat to the next person in queue, sends an urgent notification email with a time-limited claim link (15 mins), and auto-cascades if unclaimed.
-- 🎫 **Scannable QR Code Tickets**: Confirmed bookings generate cryptographically verifiable QR admission passes delivered via HTML email and downloadable as digital passes.
-- 🔍 **Live In-App QR Scanner**: Built-in verification scanner for venue staff and organisers to validate admission and prevent duplicate entries.
+- 🔏 **VaultPass Signed Tickets**: Every QR is an HMAC-SHA256 signed token. Forged or edited passes are rejected at the gate, and check-in uses CAS so the same pass can't be admitted twice.
+- 🎁 **Revocable Ticket Transfer**: Send a ticket to another user. A fresh pass is signed for the recipient and the sender's old QR is revoked instantly.
+- 🪄 **Smart Seat Finder**: One click finds the best block of adjacent seats for your group. It is aisle-aware and scored on sightlines, with different ideal depths for movies and concerts.
+- 🔍 **Live In-App QR Scanner**: Built-in verification scanner for venue staff and organisers that tells genuine, forged, revoked and already-used passes apart.
 - 📧 **Built-In Live Email Outbox**: View and test generated ticket emails, QR passes, and waitlist claim links directly inside the web UI without needing third-party SMTP services.
 - 🏛️ **Visual Venue & Seating Architect**: Admin builder to configure interactive venue layouts with VIP, Premium, and Standard rows, aisles, and capacities.
 - 📊 **Organiser Revenue Analytics**: Real-time sales metrics, occupancy percentages, and waitlist queue monitors per show.
+
+---
+
+## 🧬 What Makes TicketVault Different
+
+Most booking demos stop at "pick seats → pay → get a QR". TicketVault also covers what happens **at the gate** and **between people**:
+
+### 1. VaultPass: tamper-proof, revocable QR tickets
+A QR that is just JSON (`{"ref":"TB-..."}`) can be forged by anyone who knows a booking reference. TicketVault issues:
+
+```
+TV1.<base64url(claims)>.<base64url(HMAC-SHA256(secret, "TV1.<claims>"))>
+claims = { ref, eid, seats, iat, n /* per-issue nonce */ }
+```
+
+The gate scanner (`POST /api/admin/verify-ticket`) checks three things:
+
+| Check | Fails as |
+| :--- | :--- |
+| Signature matches (constant-time compare) | `FORGED`: edited seats or a self-made QR |
+| Token is the booking's **current** pass | `REVOKED`: an old copy from before a transfer |
+| `PENDING → CHECKED_IN` CAS update succeeds | `ALREADY_CHECKED_IN`: only 1 of N simultaneous scans wins |
+
+A typed booking reference still works, but the scanner flags it as a *manual* check-in so staff know to check ID.
+
+### 2. Revocable ticket transfer
+`POST /api/bookings/:id/transfer { recipientEmail }` moves a booking to another registered user. Because every issue has a fresh nonce, the recipient's new pass differs from the sender's, so the sender's screenshot stops working at the gate. That closes the "sell the same screenshot twice" loophole. The ownership change is a CAS update, so a transfer can't race a check-in or cancellation. Both parties get an email.
+
+### 3. Smart Seat Finder
+`GET /api/seats/event/:eventId/best?count=4&category=ANY` scores every window of N adjacent available seats that **doesn't straddle an aisle**:
+
+```
+score = 100 − 55·(distance of group centre from row centre)
+            − 45·(distance of row from ideal depth)
+ideal depth: MOVIE ≈ 60% back from the screen · CONCERT = front row
+```
+
+It returns up to 5 non-overlapping blocks ("Try another" cycles them). If no adjacent block is left, it falls back to the best individual seats and says the group will be split.
 
 ---
 
@@ -138,7 +178,7 @@ model SeatHold {
   eventId     String
   seatId      String
   userId      String
-  holdToken   String    @unique
+  holdToken   String    // shared by all seat rows of one hold session (indexed)
   expiresAt   DateTime
   isExpired   Boolean   @default(false)
 }
@@ -152,7 +192,7 @@ model Booking {
   customerEmail    String
   totalAmount      Float
   status           String        @default("CONFIRMED") // CONFIRMED, CANCELLED
-  qrCodeData       String
+  qrCodeData       String        // current signed VaultPass token (TV1.…)
   qrCodeImage      String
   checkInStatus    String        @default("PENDING") // PENDING, CHECKED_IN
   items            BookingItem[]
@@ -194,6 +234,7 @@ model WaitlistEntry {
 
 ### Real-Time Seats & Concurrency Holds
 - `GET /api/seats/event/:eventId` - Retrieve visual seat grid with real-time status
+- `GET /api/seats/event/:eventId/best?count=N&category=ANY|VIP|PREMIUM|STANDARD` - Smart Seat Finder suggestions
 - `POST /api/seats/hold` - Atomic CAS hold seats (`{ eventId, seatIds }`)
 - `POST /api/seats/release` - Release held seats on checkout cancellation
 - `GET /api/seats/hold/:holdToken` - Retrieve active hold details and remaining TTL
@@ -203,6 +244,7 @@ model WaitlistEntry {
 - `GET /api/bookings/ref/:reference` - Get booking pass by reference
 - `GET /api/bookings/my` - Get logged-in customer's booking history
 - `POST /api/bookings/:id/cancel` - Cancel booking and trigger waitlist reallocation
+- `POST /api/bookings/:id/transfer` - Transfer ticket to another user (`{ recipientEmail }`), re-signing the pass and revoking the old QR
 
 ### Priority Waitlist Engine
 - `POST /api/waitlist/join` - Join FIFO waitlist for event & seat category
@@ -211,7 +253,7 @@ model WaitlistEntry {
 - `GET /api/waitlist/my` - Get customer's waitlist positions and active offers
 
 ### Admin, QR Scanner & Email Outbox
-- `POST /api/admin/verify-ticket` - Validate QR code and check in attendees
+- `POST /api/admin/verify-ticket` - Verify a signed VaultPass (`{ qrPayload }`) or manual reference (`{ bookingReference }`) and check in atomically
 - `GET /api/admin/metrics` - System-wide performance overview
 - `GET /api/emails/outbox` - In-app outbox logs for inspecting ticket emails and claim links
 
@@ -223,6 +265,7 @@ model WaitlistEntry {
 PORT=5000
 DATABASE_URL="file:./dev.db" # Or postgresql://user:pass@host:5432/dbname
 JWT_SECRET="your-jwt-secret-key-min-32-chars"
+TICKET_SIGNING_SECRET="your-vaultpass-hmac-secret-min-32-chars" # rotating it invalidates issued passes
 CLIENT_URL="http://localhost:5173"
 HOLD_TTL_MINUTES=10
 WAITLIST_OFFER_TTL_MINUTES=15
@@ -240,7 +283,7 @@ NODE_ENV=development
 ## ☁️ Deployment Guide
 
 ### Deploying to Render / Railway
-1. Set Environment Variables (`DATABASE_URL`, `JWT_SECRET`, `CLIENT_URL`, `PORT=5000`).
+1. Set Environment Variables (`DATABASE_URL`, `JWT_SECRET`, `TICKET_SIGNING_SECRET`, `CLIENT_URL`, `PORT=5000`).
 2. Build Command: `npm run build`
 3. Start Command: `npm run start`
 

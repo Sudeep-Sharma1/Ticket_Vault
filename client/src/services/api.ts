@@ -68,6 +68,8 @@ export const api = {
 
   // Seats & Holds
   getSeatMap: (eventId: string) => request(`/seats/event/${eventId}`),
+  findBestSeats: (eventId: string, count: number, category: string) =>
+    request(`/seats/event/${eventId}/best?${new URLSearchParams({ count: String(count), category })}`),
   holdSeats: (eventId: string, seatIds: string[]) =>
     request('/seats/hold', { method: 'POST', body: JSON.stringify({ eventId, seatIds }) }),
   releaseHold: (holdToken: string) =>
@@ -83,6 +85,8 @@ export const api = {
   getBookingByRef: (ref: string) => request(`/bookings/ref/${ref}`),
   getMyBookings: () => request('/bookings/my'),
   cancelBooking: (id: string) => request(`/bookings/${id}/cancel`, { method: 'POST' }),
+  transferBooking: (id: string, recipientEmail: string) =>
+    request(`/bookings/${id}/transfer`, { method: 'POST', body: JSON.stringify({ recipientEmail }) }),
 
   // Waitlist
   joinWaitlist: (eventId: string, category: string) =>
@@ -94,7 +98,7 @@ export const api = {
 
   // Admin & Email Outbox
   getAdminMetrics: () => request('/admin/metrics'),
-  verifyTicket: (body: { bookingReference?: string; qrPayload?: any }) =>
+  verifyTicket: (body: { bookingReference?: string; qrPayload?: string }) =>
     request('/admin/verify-ticket', { method: 'POST', body: JSON.stringify(body) }),
   getEmailOutbox: () => request('/emails/outbox'),
 };

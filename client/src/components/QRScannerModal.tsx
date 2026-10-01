@@ -1,7 +1,24 @@
 import React, { useState } from 'react';
-import { QrCode, CheckCircle2, XCircle, AlertCircle, Search, User, MapPin, Calendar } from 'lucide-react';
+import { CheckCircle2, XCircle, Search, User, MapPin, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { api } from '../services/api';
 import { Modal } from './Modal';
+
+// A pass carrying a genuine-looking payload but no valid server signature,
+// used to demonstrate that edited/forged QR codes are rejected at the gate.
+const FORGED_SAMPLE = `TV1.${btoa(
+  JSON.stringify({ ref: 'TB-IN-VIP01', eid: 'forged', seats: ['A-1', 'A-2'], iat: 0, n: 'x' })
+)
+  .replace(/\+/g, '-')
+  .replace(/\//g, '_')
+  .replace(/=+$/, '')}.Zm9yZ2VkLXNpZ25hdHVyZS10aGF0LXdpbGwtbm90LW1hdGNo`;
+
+const REJECTION_TITLES: Record<string, string> = {
+  FORGED: 'Forged or Unsigned Pass',
+  REVOKED: 'Revoked Pass (Transferred)',
+  ALREADY_CHECKED_IN: 'Ticket Already Used',
+  CANCELLED: 'Ticket Cancelled',
+  INVALID: 'Unknown Ticket',
+};
 
 interface QRScannerModalProps {
   isOpen: boolean;
@@ -13,6 +30,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({ isOpen, onClose 
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [errorStatus, setErrorStatus] = useState<string | null>(null);
 
   const handleVerify = async (valToTest?: string) => {
     const val = valToTest || inputVal.trim();
@@ -20,16 +38,16 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({ isOpen, onClose 
 
     setLoading(true);
     setError(null);
+    setErrorStatus(null);
     setResult(null);
 
     try {
-      const res = await api.verifyTicket({
-        bookingReference: val.startsWith('TB-') ? val : undefined,
-        qrPayload: val.startsWith('{') ? val : val,
-      });
+      const isReference = /^TB-[A-Z0-9-]+$/i.test(val);
+      const res = await api.verifyTicket(isReference ? { bookingReference: val } : { qrPayload: val });
       setResult(res);
     } catch (err: any) {
       setError(err.message || 'Ticket verification failed');
+      setErrorStatus(err.data?.status || null);
     } finally {
       setLoading(false);
     }
@@ -39,13 +57,14 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({ isOpen, onClose 
     setInputVal('');
     setResult(null);
     setError(null);
+    setErrorStatus(null);
   };
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="🎟️ Ticket Verification & Entry Scanner" maxWidth="max-w-xl">
       <div className="space-y-4">
         <p className="text-xs text-slate-400">
-          Enter a booking reference (e.g. <code className="text-indigo-400">TB-DEMO-VIP01</code>) or raw QR payload to check-in attendees at event entrance.
+          Paste a signed VaultPass (<code className="text-indigo-400">TV1.…</code>, copy it from any ticket) to verify its signature, or type a booking reference for a manual staff check-in.
         </p>
 
         {/* Input Bar */}
@@ -54,7 +73,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({ isOpen, onClose 
             <Search className="w-4 h-4 absolute left-3 top-3.5 text-slate-500" />
             <input
               type="text"
-              placeholder="e.g. TB-XXXX-XXXX or paste QR data"
+              placeholder="TV1.… pass code or TB-XXXX-XXXX"
               value={inputVal}
               onChange={(e) => setInputVal(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleVerify()}
@@ -75,12 +94,22 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({ isOpen, onClose 
           <span>Quick test:</span>
           <button
             onClick={() => {
-              setInputVal('TB-DEMO-VIP01');
-              handleVerify('TB-DEMO-VIP01');
+              setInputVal('TB-IN-VIP01');
+              handleVerify('TB-IN-VIP01');
             }}
             className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-indigo-300 rounded-md font-mono transition"
           >
-            TB-DEMO-VIP01
+            TB-IN-VIP01
+          </button>
+          <button
+            onClick={() => {
+              setInputVal(FORGED_SAMPLE);
+              handleVerify(FORGED_SAMPLE);
+            }}
+            className="px-2.5 py-1 bg-red-950/60 hover:bg-red-900/60 text-red-300 rounded-md transition"
+            title="Submit a QR whose payload looks real but whose signature was not issued by the server"
+          >
+            Forged QR
           </button>
         </div>
 
@@ -98,6 +127,15 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({ isOpen, onClose 
               <div>
                 <h4 className="text-base font-bold text-emerald-300 font-heading">{result.message}</h4>
                 <p className="text-xs text-slate-400">Reference: <strong className="font-mono text-white">{result.booking.bookingReference}</strong></p>
+                {result.method === 'SIGNED_QR' ? (
+                  <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-bold text-emerald-300">
+                    <ShieldCheck className="w-3 h-3" /> HMAC-SHA256 signature verified
+                  </span>
+                ) : (
+                  <span className="inline-block mt-1 text-[10px] font-bold text-amber-300">
+                    Manual reference lookup: check attendee ID
+                  </span>
+                )}
               </div>
             </div>
 
@@ -133,9 +171,15 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({ isOpen, onClose 
         {/* Error State */}
         {error && (
           <div className="p-4 rounded-2xl bg-red-950/30 border border-red-500/50 flex items-start gap-3 mt-4 animate-in fade-in duration-200">
-            <XCircle className="w-6 h-6 text-red-400 flex-shrink-0 mt-0.5" />
+            {errorStatus === 'FORGED' || errorStatus === 'REVOKED' ? (
+              <ShieldAlert className="w-6 h-6 text-red-400 flex-shrink-0 mt-0.5" />
+            ) : (
+              <XCircle className="w-6 h-6 text-red-400 flex-shrink-0 mt-0.5" />
+            )}
             <div>
-              <h4 className="text-sm font-bold text-red-400">Ticket Scan Rejected</h4>
+              <h4 className="text-sm font-bold text-red-400">
+                {(errorStatus && REJECTION_TITLES[errorStatus]) || 'Ticket Scan Rejected'}
+              </h4>
               <p className="text-xs text-slate-300 mt-1">{error}</p>
               <button
                 onClick={handleReset}

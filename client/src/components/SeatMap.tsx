@@ -9,6 +9,7 @@ interface SeatMapProps {
   onToggleSeat: (seat: SeatItem) => void;
   tierPricing: Record<string, number>;
   disabled?: boolean;
+  aisles?: Record<string, number[]>; // row label -> seat numbers followed by an aisle
 }
 
 export const SeatMap: React.FC<SeatMapProps> = ({
@@ -18,6 +19,7 @@ export const SeatMap: React.FC<SeatMapProps> = ({
   onToggleSeat,
   tierPricing,
   disabled = false,
+  aisles = {},
 }) => {
   const [hoveredSeat, setHoveredSeat] = useState<SeatItem | null>(null);
 
@@ -97,28 +99,30 @@ export const SeatMap: React.FC<SeatMapProps> = ({
                     const isAvailable = seat.status === 'AVAILABLE';
 
                     return (
-                      <button
-                        key={seat.id}
-                        type="button"
-                        disabled={disabled || (!isAvailable && !selected)}
-                        onClick={() => onToggleSeat(seat)}
-                        onMouseEnter={() => setHoveredSeat(seat)}
-                        onMouseLeave={() => setHoveredSeat(null)}
-                        className={`w-8 h-8 rounded-lg text-xs font-mono font-semibold flex items-center justify-center transition-all duration-150 border relative ${getSeatColor(
-                          seat
-                        )}`}
-                        title={`Seat ${seat.label} • ₹${seat.price}`}
-                      >
-                        {selected ? (
-                          <Check className="w-4 h-4" />
-                        ) : seat.status === 'BOOKED' ? (
-                          <Lock className="w-3 h-3 opacity-60" />
-                        ) : seat.status === 'HELD' ? (
-                          <Clock className="w-3 h-3" />
-                        ) : (
-                          seat.number
-                        )}
-                      </button>
+                      <React.Fragment key={seat.id}>
+                        <button
+                          type="button"
+                          disabled={disabled || (!isAvailable && !selected)}
+                          onClick={() => onToggleSeat(seat)}
+                          onMouseEnter={() => setHoveredSeat(seat)}
+                          onMouseLeave={() => setHoveredSeat(null)}
+                          className={`w-8 h-8 rounded-lg text-xs font-mono font-semibold flex items-center justify-center transition-all duration-150 border relative ${getSeatColor(
+                            seat
+                          )}`}
+                          title={`Seat ${seat.label} • ₹${seat.price}`}
+                        >
+                          {selected ? (
+                            <Check className="w-4 h-4" />
+                          ) : seat.status === 'BOOKED' ? (
+                            <Lock className="w-3 h-3 opacity-60" />
+                          ) : seat.status === 'HELD' ? (
+                            <Clock className="w-3 h-3" />
+                          ) : (
+                            seat.number
+                          )}
+                        </button>
+                        {aisles[rowLabel]?.includes(seat.number) && <div className="w-4" aria-hidden />}
+                      </React.Fragment>
                     );
                   })}
                 </div>

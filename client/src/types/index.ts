@@ -85,6 +85,14 @@ export interface SeatItem {
   holdExpiresAt?: string;
 }
 
+export interface SeatSuggestion {
+  seatIds: string[];
+  labels: string[];
+  score: number;
+  contiguous: boolean;
+  totalPrice: number;
+}
+
 export interface BookingItemDetail {
   id: string;
   seatId: string;

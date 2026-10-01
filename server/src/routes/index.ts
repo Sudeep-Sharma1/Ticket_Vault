@@ -39,6 +39,7 @@ router.get('/organiser/dashboard', authenticateToken, requireRole('ORGANISER', '
 // 4. Seat Map & Atomic Hold Routes
 // ==========================================
 router.get('/seats/event/:eventId', seatController.getEventSeatMap);
+router.get('/seats/event/:eventId/best', seatController.findBestSeats);
 router.post('/seats/hold', authenticateToken, seatController.holdSeats);
 router.post('/seats/release', optionalAuth, seatController.releaseHold);
 router.post('/seats/release-my-holds', authenticateToken, seatController.releaseMyEventHolds);
@@ -52,6 +53,7 @@ router.post('/bookings/checkout', authenticateToken, bookingController.checkout)
 router.get('/bookings/ref/:reference', bookingController.getBookingByReference);
 router.get('/bookings/my', authenticateToken, bookingController.getCustomerBookings);
 router.post('/bookings/:id/cancel', authenticateToken, bookingController.cancelBooking);
+router.post('/bookings/:id/transfer', authenticateToken, bookingController.transferBooking);
 
 // ==========================================
 // 6. Waitlist Routes

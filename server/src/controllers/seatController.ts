@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/prisma';
 import { holdService } from '../services/holdService';
+import { seatFinderService } from '../services/seatFinderService';
 import { AuthenticatedRequest } from '../types';
 import { AppError } from '../middleware/errorHandler';
 
@@ -67,6 +68,22 @@ export const seatController = {
         seats,
         seatGrid: rowMap,
       });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  // Smart Seat Finder: best-scored group of adjacent available seats
+  findBestSeats: async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { eventId } = req.params;
+      const count = parseInt(String(req.query.count ?? '2'), 10);
+      const category = typeof req.query.category === 'string' && req.query.category !== 'ANY'
+        ? req.query.category
+        : undefined;
+
+      const result = await seatFinderService.findBestSeats(eventId, count, category);
+      res.json(result);
     } catch (err) {
       next(err);
     }

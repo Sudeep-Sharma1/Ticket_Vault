@@ -57,7 +57,7 @@ WHERE "id" IN (:seatIds)
   - The database engine guarantees single-statement row atomicity.
   - If `affected_rows == requested_seat_count`, the user wins the lock, and `SeatHold` records are persisted.
   - If `affected_rows < requested_seat_count`, another concurrent request locked one or more of the seats a fraction of a millisecond earlier.
-  - Any partially updated seats are immediately rolled back, and an HTTP `409 Conflict` (`"Seat(s) are no longer available"`) is returned without data inconsistency.
+  - The CAS update and the `SeatHold` inserts run in one database transaction. A short count throws, which rolls back only *this* request's partial CAS (seats legitimately held by other customers are never touched), and HTTP `409 Conflict` is returned.
 - **Stress-Tested Correctness**: Verified via automated concurrency tests dispatching 10 parallel requests for the same seat: **exactly 1 winner succeeds, 9 are cleanly rejected, 0 double-bookings**.
 
 ---
@@ -105,6 +105,22 @@ sequenceDiagram
 
 ## 5. QR Code Generation & Entry Verification
 Upon confirmed checkout:
-- Generates cryptographically verifiable QR codes encoding `{ ref, eventId, eventTitle, seats, issuedAt }`.
-- Embeds QR data into confirmation emails and downloadable digital wallet passes.
-- Organisers utilize the built-in QR Scanner endpoint (`POST /api/admin/verify-ticket`) to enforce one-time admission check-in, preventing counterfeit or duplicate entry.
+- Issues a signed **VaultPass** token, `TV1.<base64url(claims)>.<HMAC-SHA256>`, with claims `{ ref, eid, seats, iat, n }` (`n` = per-issue nonce). The token is stored as `Booking.qrCodeData` and rendered as the QR.
+- Embeds the QR into confirmation emails and the digital pass.
+- The scanner endpoint (`POST /api/admin/verify-ticket`) admits a pass only if:
+  1. the HMAC verifies (constant-time compare), otherwise `FORGED`;
+  2. the token equals the booking's *current* `qrCodeData`, otherwise `REVOKED` (superseded by a transfer);
+  3. a CAS `UPDATE … SET checkInStatus='CHECKED_IN' WHERE checkInStatus='PENDING'` affects 1 row, otherwise `ALREADY_CHECKED_IN`. Simultaneous scans at different gates can't both admit.
+- A typed booking reference is accepted as a staff-assisted `MANUAL_REFERENCE` check-in.
+
+### Ticket Transfer
+`POST /api/bookings/:id/transfer` re-signs a fresh VaultPass for the recipient and swaps ownership with a CAS update conditioned on `{ userId, status: CONFIRMED, checkInStatus: PENDING, qrCodeData: <old> }`. The sender's QR is revoked by construction, and a transfer can't race a check-in, a cancellation or a second transfer.
+
+---
+
+## 6. Smart Seat Finder
+`GET /api/seats/event/:eventId/best?count=N&category=…` enumerates every window of N adjacent `AVAILABLE` seats in the same aisle block (`layoutConfig.rows[].aisleAfter`) and scores it:
+
+`score = 100 − 55·|groupCentre − rowCentre| / halfRow − 45·|rowDepth − idealDepth| / maxGap`
+
+`idealDepth` is about 0.6 for `MOVIE` (cinema sightline sweet spot) and 0 for `CONCERT` (front of stage). Up to 5 non-overlapping windows are returned. If no adjacent block exists, the best individual seats are returned with `contiguous: false`.

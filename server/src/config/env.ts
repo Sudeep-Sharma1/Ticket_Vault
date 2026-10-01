@@ -5,6 +5,7 @@ export const ENV = {
   PORT: parseInt(process.env.PORT || '5000', 10),
   DATABASE_URL: process.env.DATABASE_URL || 'file:./dev.db',
   JWT_SECRET: process.env.JWT_SECRET || 'ticket-booking-jwt-secret-key-2026',
+  TICKET_SIGNING_SECRET: process.env.TICKET_SIGNING_SECRET || 'ticketvault-vaultpass-signing-key-2026',
   CLIENT_URL: process.env.CLIENT_URL || 'http://localhost:5173',
   HOLD_TTL_MINUTES: parseInt(process.env.HOLD_TTL_MINUTES || '10', 10),
   WAITLIST_OFFER_TTL_MINUTES: parseInt(process.env.WAITLIST_OFFER_TTL_MINUTES || '15', 10),

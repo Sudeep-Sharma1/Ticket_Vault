@@ -44,17 +44,12 @@ export const bookingController = {
 
       const bookingReference = generateBookingReference();
 
-      // Generate Scannable QR Code
-      const qrPayload = {
+      // Generate signed (tamper-proof) VaultPass QR Code
+      const { qrDataString, qrDataUrl } = await generateTicketQRCode({
         ref: bookingReference,
         eventId: event.id,
-        eventTitle: event.title,
         seats: seatLabels,
-        customerEmail,
-        issuedAt: new Date().toISOString(),
-      };
-
-      const { qrDataString, qrDataUrl } = await generateTicketQRCode(qrPayload);
+      });
 
       // Perform atomic checkout transaction
       const booking = await prisma.$transaction(async (tx) => {
@@ -175,6 +170,100 @@ export const bookingController = {
       });
 
       res.json({ bookings });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  // Transfer a booking to another registered user.
+  // A fresh signed VaultPass is issued to the recipient; the sender's old QR is revoked.
+  transferBooking: async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    try {
+      const { id } = req.params;
+      const { recipientEmail } = req.body;
+      const userId = req.user!.id;
+
+      if (!recipientEmail || typeof recipientEmail !== 'string') {
+        throw new AppError('Recipient email is required', 400);
+      }
+
+      const booking = await prisma.booking.findUnique({
+        where: { id },
+        include: { items: true, event: true, user: true },
+      });
+
+      if (!booking) {
+        throw new AppError('Booking not found', 404);
+      }
+      if (booking.userId !== userId) {
+        throw new AppError('Only the ticket holder can transfer this booking', 403);
+      }
+      if (booking.status !== 'CONFIRMED') {
+        throw new AppError('Only confirmed bookings can be transferred', 400);
+      }
+      if (booking.checkInStatus === 'CHECKED_IN') {
+        throw new AppError('This ticket has already been used for entry and cannot be transferred', 400);
+      }
+      if (new Date(booking.event.showTime) <= new Date()) {
+        throw new AppError('Tickets cannot be transferred after the show has started', 400);
+      }
+
+      const recipient = await prisma.user.findUnique({
+        where: { email: recipientEmail.trim().toLowerCase() },
+      });
+      if (!recipient) {
+        throw new AppError('No TicketVault account found for that email. Ask them to register first.', 404);
+      }
+      if (recipient.id === userId) {
+        throw new AppError('You already hold this ticket', 400);
+      }
+
+      const seatLabels = booking.items.map((i) => i.seatLabel);
+      const { qrDataString, qrDataUrl } = await generateTicketQRCode({
+        ref: booking.bookingReference,
+        eventId: booking.eventId,
+        seats: seatLabels,
+      });
+
+      // CAS update: fails if the ticket was scanned, cancelled or transferred concurrently
+      const result = await prisma.booking.updateMany({
+        where: {
+          id,
+          userId,
+          status: 'CONFIRMED',
+          checkInStatus: 'PENDING',
+          qrCodeData: booking.qrCodeData,
+        },
+        data: {
+          userId: recipient.id,
+          customerName: recipient.name,
+          customerEmail: recipient.email,
+          customerPhone: recipient.phone,
+          qrCodeData: qrDataString,
+          qrCodeImage: qrDataUrl,
+        },
+      });
+
+      if (result.count === 0) {
+        throw new AppError('Ticket state changed during transfer. Please refresh and try again.', 409);
+      }
+
+      emailService.sendTicketTransfer({
+        senderEmail: booking.user.email,
+        senderName: booking.user.name,
+        recipientEmail: recipient.email,
+        recipientName: recipient.name,
+        bookingReference: booking.bookingReference,
+        eventTitle: booking.event.title,
+        seats: seatLabels,
+        qrCodeImage: qrDataUrl,
+      }).catch((err) => console.error('[Transfer Email Error]:', err));
+
+      res.json({
+        message: `Ticket ${booking.bookingReference} transferred to ${recipient.name}. Your old QR pass is now revoked.`,
+        bookingId: id,
+        recipient: { name: recipient.name, email: recipient.email },
+      });
     } catch (err) {
       next(err);
     }

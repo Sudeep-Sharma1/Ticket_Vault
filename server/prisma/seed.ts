@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { generateTicketQRCode } from '../src/services/qrService';
 
 const prisma = new PrismaClient();
 
@@ -227,6 +228,12 @@ async function main() {
     take: 2,
   });
 
+  const demoPass = await generateTicketQRCode({
+    ref: 'TB-IN-VIP01',
+    eventId: soldOutEvent.id,
+    seats: vipSeats.map((s) => s.label),
+  });
+
   const demoBooking = await prisma.booking.create({
     data: {
       bookingReference: 'TB-IN-VIP01',
@@ -236,8 +243,8 @@ async function main() {
       customerEmail: customer1.email,
       totalAmount: 1700.0, // ₹1,700 for 2 VIP tickets
       status: 'CONFIRMED',
-      qrCodeData: JSON.stringify({ ref: 'TB-IN-VIP01', event: soldOutEvent.title, seats: ['A-1', 'A-2'] }),
-      qrCodeImage: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      qrCodeData: demoPass.qrDataString,
+      qrCodeImage: demoPass.qrDataUrl,
       items: {
         create: vipSeats.map((s) => ({
           seatId: s.id,

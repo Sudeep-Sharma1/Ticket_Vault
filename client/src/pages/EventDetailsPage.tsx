@@ -12,11 +12,15 @@ import {
   CheckCircle2,
   Flame,
   ShieldCheck,
+  Wand2,
+  Shuffle,
+  Minus,
+  Plus,
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
-import { EventItem, SeatItem } from '../types';
+import { EventItem, SeatItem, SeatSuggestion, VenueRowLayout } from '../types';
 import { SeatMap } from '../components/SeatMap';
 import { Modal } from '../components/Modal';
 
@@ -32,6 +36,14 @@ export const EventDetailsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [holding, setHolding] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [aisles, setAisles] = useState<Record<string, number[]>>({});
+
+  // Smart Seat Finder State
+  const [smartCount, setSmartCount] = useState(2);
+  const [smartTier, setSmartTier] = useState('ANY');
+  const [smartSuggestions, setSmartSuggestions] = useState<SeatSuggestion[]>([]);
+  const [smartIndex, setSmartIndex] = useState(0);
+  const [smartLoading, setSmartLoading] = useState(false);
 
   // Waitlist Modal State
   const [isWaitlistModalOpen, setIsWaitlistModalOpen] = useState(false);
@@ -49,6 +61,8 @@ export const EventDetailsPage: React.FC = () => {
       ]);
       setEvent(eventRes.event);
       setSeatGrid(seatMapRes.seatGrid || {});
+      const rows: VenueRowLayout[] = seatMapRes.layoutConfig?.rows || [];
+      setAisles(Object.fromEntries(rows.map((r) => [r.label, r.aisleAfter || []])));
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to load event data');
     } finally {
@@ -121,6 +135,7 @@ export const EventDetailsPage: React.FC = () => {
 
   const handleToggleSeat = (seat: SeatItem) => {
     setErrorMessage(null);
+    setSmartSuggestions([]);
     if (selectedSeats.some((s) => s.id === seat.id)) {
       setSelectedSeats(selectedSeats.filter((s) => s.id !== seat.id));
     } else {
@@ -130,6 +145,36 @@ export const EventDetailsPage: React.FC = () => {
       }
       setSelectedSeats([...selectedSeats, seat]);
     }
+  };
+
+  const applySuggestion = (suggestion: SeatSuggestion) => {
+    const allSeats = Object.values(seatGrid).flat();
+    const picked = suggestion.seatIds
+      .map((seatId) => allSeats.find((s) => s.id === seatId))
+      .filter((s): s is SeatItem => !!s && s.status === 'AVAILABLE');
+    setSelectedSeats(picked);
+  };
+
+  const handleSmartPick = async () => {
+    setSmartLoading(true);
+    setErrorMessage(null);
+    try {
+      const res = await api.findBestSeats(id!, smartCount, smartTier);
+      setSmartSuggestions(res.suggestions);
+      setSmartIndex(0);
+      applySuggestion(res.suggestions[0]);
+    } catch (err: any) {
+      setSmartSuggestions([]);
+      setErrorMessage(err.message || 'Could not find seats matching your request');
+    } finally {
+      setSmartLoading(false);
+    }
+  };
+
+  const handleNextSuggestion = () => {
+    const next = (smartIndex + 1) % smartSuggestions.length;
+    setSmartIndex(next);
+    applySuggestion(smartSuggestions[next]);
   };
 
   const handleHoldAndProceed = async () => {
@@ -324,7 +369,94 @@ export const EventDetailsPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Smart Seat Finder */}
+        <div className="mb-6 p-4 rounded-2xl bg-indigo-950/30 border border-indigo-500/30">
+          <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+            <div className="flex items-center gap-2 text-indigo-200">
+              <Wand2 className="w-4 h-4 text-indigo-400" />
+              <span className="text-xs font-bold uppercase tracking-wider">Smart Seat Finder</span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 lg:ml-auto">
+              <div className="flex items-center rounded-xl bg-slate-900 border border-slate-700">
+                <button
+                  type="button"
+                  onClick={() => setSmartCount((c) => Math.max(1, c - 1))}
+                  className="p-2 text-slate-400 hover:text-white"
+                  aria-label="Fewer seats"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+                <span className="w-16 text-center text-xs font-bold text-white">
+                  {smartCount} seat{smartCount > 1 ? 's' : ''}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSmartCount((c) => Math.min(8, c + 1))}
+                  className="p-2 text-slate-400 hover:text-white"
+                  aria-label="More seats"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <select
+                value={smartTier}
+                onChange={(e) => setSmartTier(e.target.value)}
+                className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+              >
+                <option value="ANY">Any tier</option>
+                <option value="VIP">VIP</option>
+                <option value="PREMIUM">Premium</option>
+                <option value="STANDARD">Standard</option>
+              </select>
+
+              <button
+                type="button"
+                onClick={handleSmartPick}
+                disabled={smartLoading || holding}
+                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold transition flex items-center gap-1.5"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                {smartLoading ? 'Scoring seats...' : 'Find Best Seats'}
+              </button>
+
+              {smartSuggestions.length > 1 && (
+                <button
+                  type="button"
+                  onClick={handleNextSuggestion}
+                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition flex items-center gap-1.5"
+                >
+                  <Shuffle className="w-3.5 h-3.5" />
+                  Try another ({smartIndex + 1}/{smartSuggestions.length})
+                </button>
+              )}
+            </div>
+          </div>
+
+          {smartSuggestions[smartIndex] && (
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+              <span className="text-slate-300">
+                Picked <strong className="font-mono text-white">{smartSuggestions[smartIndex].labels.join(', ')}</strong>
+              </span>
+              <span className="text-emerald-400 font-bold">
+                Sightline score {smartSuggestions[smartIndex].score}/100
+              </span>
+              {smartSuggestions[smartIndex].contiguous ? (
+                <span className="text-cyan-300">Sitting together, no aisle split</span>
+              ) : (
+                <span className="text-amber-300">No adjacent block left: best seats are split up</span>
+              )}
+            </div>
+          )}
+          <p className="mt-2 text-[11px] text-slate-500">
+            Ranks every adjacent block by distance from the row centre and from the ideal viewing depth
+            ({event.category === 'CONCERT' ? 'closest to the stage' : 'about 60% back from the screen'}).
+          </p>
+        </div>
+
         <SeatMap
+          aisles={aisles}
           seatGrid={seatGrid}
           selectedSeats={selectedSeats}
           currentUserId={user?.id}

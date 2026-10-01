@@ -13,6 +13,7 @@ import {
   ShieldAlert,
   RotateCcw,
   Sparkles,
+  Send,
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
@@ -32,6 +33,12 @@ export const CustomerBookingsPage: React.FC = () => {
   const [cancellingBooking, setCancellingBooking] = useState<BookingDetail | null>(null);
   const [cancellingLoading, setCancellingLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+
+  // Transfer State
+  const [transferringBooking, setTransferringBooking] = useState<BookingDetail | null>(null);
+  const [transferEmail, setTransferEmail] = useState('');
+  const [transferLoading, setTransferLoading] = useState(false);
+  const [transferError, setTransferError] = useState<string | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -67,6 +74,28 @@ export const CustomerBookingsPage: React.FC = () => {
       alert(err.message || 'Failed to cancel booking');
     } finally {
       setCancellingLoading(false);
+    }
+  };
+
+  const closeTransfer = () => {
+    setTransferringBooking(null);
+    setTransferEmail('');
+    setTransferError(null);
+  };
+
+  const handleTransferBooking = async () => {
+    if (!transferringBooking || !transferEmail.trim()) return;
+    setTransferLoading(true);
+    setTransferError(null);
+    try {
+      const res = await api.transferBooking(transferringBooking.id, transferEmail.trim());
+      setActionMessage(res.message);
+      closeTransfer();
+      fetchData();
+    } catch (err: any) {
+      setTransferError(err.message || 'Failed to transfer ticket');
+    } finally {
+      setTransferLoading(false);
     }
   };
 
@@ -221,6 +250,15 @@ export const CustomerBookingsPage: React.FC = () => {
                           >
                             View QR Pass
                           </button>
+                          {b.checkInStatus === 'PENDING' && new Date(b.event.showTime) > new Date() && (
+                            <button
+                              onClick={() => setTransferringBooking(b)}
+                              className="px-3 py-2 bg-cyan-950/40 hover:bg-cyan-900/60 text-cyan-300 border border-cyan-500/30 rounded-xl text-xs font-semibold transition flex items-center gap-1"
+                              title="Send this ticket to another TicketVault user"
+                            >
+                              <Send className="w-3.5 h-3.5" /> Transfer
+                            </button>
+                          )}
                           <button
                             onClick={() => setCancellingBooking(b)}
                             className="px-3 py-2 bg-red-950/40 hover:bg-red-900/60 text-red-400 border border-red-500/30 rounded-xl text-xs font-semibold transition"
@@ -323,6 +361,67 @@ export const CustomerBookingsPage: React.FC = () => {
         maxWidth="max-w-3xl"
       >
         {selectedTicket && <TicketCard booking={selectedTicket} />}
+      </Modal>
+
+      {/* Transfer Ticket Modal */}
+      <Modal
+        isOpen={!!transferringBooking}
+        onClose={closeTransfer}
+        title="🎁 Transfer Ticket"
+        maxWidth="max-w-md"
+      >
+        {transferringBooking && (
+          <div className="space-y-4">
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Send <strong className="font-mono text-cyan-400">{transferringBooking.bookingReference}</strong> (
+              {transferringBooking.items.map((i) => i.seatLabel).join(', ')}) for{' '}
+              <strong>{transferringBooking.event.title}</strong> to another registered TicketVault user.
+            </p>
+
+            <div className="p-4 rounded-xl bg-cyan-950/30 border border-cyan-500/40 text-xs space-y-1">
+              <p className="font-bold text-cyan-300">How transfer works</p>
+              <p className="text-slate-300">
+                A freshly signed QR pass is issued to the recipient. Your current QR is revoked
+                immediately and will be rejected at the gate, so a ticket can't be resold twice.
+              </p>
+            </div>
+
+            <input
+              type="email"
+              placeholder="recipient@example.com"
+              value={transferEmail}
+              onChange={(e) => setTransferEmail(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleTransferBooking()}
+              className="w-full px-4 py-2.5 bg-slate-900/80 border border-slate-700 rounded-xl text-slate-200 text-sm focus:outline-none focus:border-cyan-500"
+            />
+
+            {transferError && (
+              <div className="p-3 rounded-xl bg-red-950/40 border border-red-500/50 text-red-300 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span>{transferError}</span>
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={closeTransfer}
+                className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition"
+              >
+                Keep Ticket
+              </button>
+              <button
+                type="button"
+                onClick={handleTransferBooking}
+                disabled={transferLoading || !transferEmail.trim()}
+                className="flex-1 py-2.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition shadow-lg shadow-cyan-600/30 flex items-center justify-center gap-2"
+              >
+                <Send className="w-3.5 h-3.5" />
+                {transferLoading ? 'Re-issuing pass...' : 'Transfer Ticket'}
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* Cancel Confirmation Modal */}
